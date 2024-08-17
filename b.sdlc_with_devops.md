@@ -13,6 +13,9 @@
 
 **Different Phases of SDLC**
 
+DevOps LifeCycle:
+![Dev Ops](https://www.shalb.com/wp-content/uploads/2019/11/Devops1.jpeg)
+
 There are different phases or stages in a typical SDLC. While specific names may vary depending on the methodology used (e.g., Waterfall vs. Agile), they generally follow a similar flow:
 
 1. **Planning:**

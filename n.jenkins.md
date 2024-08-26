@@ -234,6 +234,125 @@ To test this, update your code and commit to GitHub, then wait for a minute. Wit
 
 Now that we have set trigger to automatically pull code from GitHub and run the code. We will not be checking the console output everytime for Job success state. If the Job fails, we don't get notified untill we see the Console Output. In such cases, we can set Email notification for the Jobs.
 
+### Email Notification on Job Failure
+
+Now that we have set up a trigger to automatically pull code from GitHub and run it, we will not be checking the console output every time for job success status. If the job fails, we don't get notified until we check the console output. In such cases, we can set up email notifications for the jobs.
+
+For this, first we need to set up email notifications. We are using Gmail SMTP in this example.
+
+Google Account:
+- You can create a demo Google account for this example, or you can use your existing Gmail account. The account should have MFA enabled.
+- Log in to your account. Go to **Manage your Google Account**.
+- Click on **Security**. Verify that **2-step verification** is enabled.
+- In the search bar, search for **App Passwords**. Select it. Provide an **App name** and click on **Create**.
+- You will get an *App password*. Copy and save it in a notepad.
+
+Jenkins Dashboard:
+- Click on **Manage Jenkins**. In **System Configuration**, click on **System**.
+- Scroll down to the bottom to the **E-mail Notification** option. Provide your mail server details in **SMTP server**. Since we are using Google SMTP, our mail server name is `smtp.gmail.com`.
+- In **Default user e-mail suffix**, you can provide `@jenkinstest.com` (just for demo purposes).
+- Click on the **Advanced** dropdown. Enable the **Use SMTP Authentication** option. It will ask for **Username** and **Password**. The Username should be your Gmail ID and the Password will be your *App Password* that you saved in the notepad.
+- Check the **Use SSL** option.
+- Provide **SMTP Port** as `465` (It should pick the port by default; otherwise, you can provide it manually).
+- Check the option **Test configuration by sending test e-mail** for testing purposes. Provide the recipient's email in **Test e-mail recipient**. Click on **Test Configuration**.
+- Check your Gmail Inbox for the test email.
+- Once you receive confirmation that the email configuration is working, click on **Save**.
+
+Now integrate the email notification with the Jenkins job. We are using the `git-demo` job for email notification setup.
+- Click on the job. Click on **Configure**.
+- Scroll down to **Post-build Actions**. Click on the **Add post-build actions** dropdown.
+- Choose **E-mail notification**. Provide the recipient's email in **Recipients**.
+- Check the option **Send e-mail for every unstable build**.
+- Click on **Save**.
+
+Now, whenever a developer commits code to GitHub that causes an error, Jenkins will trigger, clone the code, and try to run it. If it encounters an error, it means the job fails. At this point, an email is sent to the designated recipients notifying them that the job has failed. The developer can then fix the issue and commit the code again to GitHub. Jenkins will trigger, clone the code, and run it again. If the job is successful, a success notification will also be sent to the recipients, notifying them that the job was successful.
+
+### Jenkins Job for Remote Server
+
+Using the Jenkins server, we will perform some actions on a remote server. For this, you need two servers: one CentOS server (centos1) where Jenkins is installed, and another CentOS server (centos2) where you want to perform some actions.
+
+1. First, we need to establish access between centos1 and centos2 servers:
+- Log in to the centos2 server and get the IP using the `ifconfig` command. (Example: centos2: 10.211.55.11)
+- To create a passwordless connection between the two servers, log in to the centos1 server and generate a keypair using `ssh-keygen`.
+
+```bash
+[paul@centos01 ~]$ ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/paul/.ssh/id_rsa) :
+Enter passphrase (empty for no passphrase) :
+Enter same passphrase again:
+Your identification has been saved in /home/paul/.ssh/id_rsa
+Your public key has been saved in /home/paul/.ssh/id_rsa.pub
+The key fingerprint is:
+SHA256: TMdfHw0u4BdQAZApYPofSs105qft3tZcxwz0Z4eTlHk paul@centos01
+```
+
+- Then, copy the key to the centos2 server using `ssh-copy-id`. It will prompt for the password of the centos2 server once; enter the password.
+
+```bash
+[paul@centos01 ~]$ ssh-copy-id paul@10.211.55.11
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any 
+that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now i
+t is to install the new keys
+paul@10.211.55.11's password:
+
+Number of keys added: 1
+
+Now try logging into the machine with: "ssh 'paul@10.211.55.11'"
+and check to make sure that only the key(s) you wanted were added.
+```
+
+- Once this is done, you can directly SSH into the centos2 server without a password.
+
+```bash
+[paul@centos01 ~]$ ssh paul@10.211.55.11
+Activate the web console with: systemctl enable --now cockpit.socket
+
+Last login: Mon Apr 8 07:14:04 2024 from 10.211.55.7
+[paul@centos02 ~]$
+```
+
+2. Next step, in Jenkins Dashboard:
+- Click on **Manage Jenkins**. Click on **Plugins**. Click on **Available Plugins**.
+- Search and install the **Publish over SSH** plugin. (You can use it right away or after a restart.)
+- Once installed, click on **Manage Jenkins** again. Click on **System**. Scroll down to **Publish over SSH** option.
+- You need to provide the **Path to key** or **Key** (Private Key) itself of the Jenkins server to establish a connection to the centos2 server.
+
+Log in to the centos1 server, where Jenkins is installed, and get the private key you generated.
+```bash
+[paul@centos01 ~]$ pwd
+/home/paul
+[paul@centos01 ~]$ cd .ssh/
+[paul@centos01 .ssh]$ ls
+id_rsa id_rsa.pub known_hosts known_hosts.old
+[paul@centos01 .ssh]$ cat id_rsa
+```
+
+- Copy the key from the beginning `---BEGIN OPENSSH PRIVATE KEY---` to the last line `---END OPENSSH PRIVATE KEY---`. Paste it in the Jenkins **Key** option in **Publish over SSH**.
+- Next, in **SSH Servers**, click on the **Add** button. (Add the remote server details you want to connect to.)
+- Provide a **Name** for the server for your reference (e.g., `centos2`). **Hostname** can be the server IP `10.211.55.11`. Provide the **Username** of the remote server (in this example, it's `paul`). [Optional] **Remote Directory** is the default directory where you want to perform actions.
+- Click on **Save**.
+
+3. Now, create a new job to perform actions on the remote server.
+- In Jenkins, click on **New Item**. Enter an item name: `remote-job`. Choose **Freestyle project**. Click on **OK**.
+- Scroll down to **Build Steps**. Click on **Add build step** dropdown. Choose **Send files or execute commands over SSH**.
+- It will provide the **SSH Publishers** details. You can choose the `centos2` server details you provided in the previous steps.
+- In the same option, scroll down to **Transfers**. Provide the **Source Path** of the file you want to transfer. By default, it checks the file in `/var/lib/jenkins/workspace/remote-job/` of the centos1 server.
+- You can create a directory named `files` in this path and keep your files there. In this example, we are keeping `basic.sh` in this folder.
+- So in **Transfers**, in **Source Path**, you can provide `files/basic.sh`. In **Exec Command**, you can give `bash /home/paul/files/basic.sh`.
+- Click on **Save**.
+
+This should copy the `file/basic.sh` from centos1 to the centos2 server. Since we have not provided a **Remote Directory** path in **Transfers**, it will copy the `files` folder and its files to the user home directory of centos2. Then it executes the script with the commands provided in the **Exec Command** option.
+
+#### Transfer Multiple Files and Exclude Files
+
+- Use the same steps; just in **Transfers**, in **Source Path**, you can provide `files/*`. Now all files inside the `files` directory will be transferred to the remote server.
+- In the same option, if you scroll down, you will find the **Advanced** option. You can choose **Exclude files** and enter the files you want to exclude during the transfer. In this example, you can provide `files/file1`.
+- Now all files in the `files` directory will be copied to the remote server, excluding `file1`.
+
+> Note: You can use coma separared values for multiple files.
+
 
 
 

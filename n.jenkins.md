@@ -351,19 +351,113 @@ This should copy the `file/basic.sh` from centos1 to the centos2 server. Since w
 - In the same option, if you scroll down, you will find the **Advanced** option. You can choose **Exclude files** and enter the files you want to exclude during the transfer. In this example, you can provide `files/file1`.
 - Now all files in the `files` directory will be copied to the remote server, excluding `file1`.
 
-> Note: You can use coma separared values for multiple files.
+> Note: You can use coma separared values to add multiple files.
 
+#### Quick Overview of Ansible Setup
 
+In the `centos1` server, both Jenkins and Ansible are installed. We have some simple Ansible playbooks ready for demo purposes. To run a playbook, we use `ansible-playbook first_pb.yml`. This playbook contains commands to ping the localhost. All the playbooks are kept in the `/etc/ansible/playbooks` directory.
 
+### Jenkins Job with Ansible
 
+To configure Ansible with Jenkins, we need to install plugins in Jenkins.
 
+- Log in to the Jenkins Dashboard. Click on **Manage Jenkins**. Click on **Plugins**. Click on **Available Plugins**.
+- Search and install the **Ansible** plugin. (You can use it right away or after a restart.)
+- Click on **New Item**. Enter an item name: `ansible-job`. Choose **Freestyle project**. Click on **OK**.
+- Scroll down to **Build Steps**. Click on the **Add build step** dropdown. Choose **Invoke Ansible Playbook**.
+- Provide the **Playbook path**: `/etc/ansible/playbooks/first_pb.yml`. Click on **Save**.
+- Click on **Build Now**.
 
+Now try to include the **remote host IP** in the playbook and invoke it using Jenkins. You may encounter an error because Jenkins invokes the playbook using the `jenkins` user. Since Jenkins is installed on the `centos1` server, it will already have a **jenkins** user. However, this user does not exist on the `centos2` server (the remote server) where we are trying to run the playbook. Thus, you need to create the `jenkins` user on the `centos2` server and provide root access. (In RedHat/CentOS, you can add the user to the `wheel` group for root access.)
 
+```bash
+[paul@centos02 ~]$ sudo useradd jenkins
+[paul@centos02 ~]$ sudo passwd jenkins
+Changing password for user jenkins.
+New password:
+BAD PASSWORD: The password is shorter than 8 characters
+Retype new password:
+passwd: all authentication tokens updated successfully.
+[paul@centos02 ~]$ id jenkins
+uid=1001(jenkins) gid=1001(jenkins) groups=1001(jenkins)
+[paul@centos02 ~]$ sudo usermod -aG wheel jenkins
+[paul@centos02 ~]$ id jenkins
+uid=1001(jenkins) gid=1001(jenkins) groups=1001(jenkins),10(wheel)
+```
 
+On the `centos1` server, we already have the `jenkins` user, but by default, it does not have a shell. So you need to use `sudo su -s /bin/bash jenkins` to start a shell for the **jenkins** user. Then establish a passwordless connection between `centos1` and `centos2` using the **jenkins** user.
 
+```bash
+[paul@centos01 playbooks]$ sudo su -s /bin/bash jenkins
+bash-5.1$ whoami
+jenkins
+bash-5.1$ ssh-keygen
+bash-5.1$ ssh-copy-id jenkins@10.211.55.11
+bash-5.1$ ssh jenkins@10.211.55.11
+[jenkins@centos02 ~]$
+```
 
+Now when you run the same job again, it should be successful. The `jenkins` user has permission to run the playbook on the `centos2` (remote server) from the `centos1` server.
 
+### Project: Remote Webserver Changes
 
+In this example, the scenario is that on the `centos2` server, we have an Apache webserver running, and the website is live. We are going to make changes to this using Jenkins. Jenkins will pull code from GitHub, copy it to the `centos2` server, and restart the service.
 
+First, set up an Apache server on `centos2`.
 
+```bash
+[paul@centos02 ~]$ sudo yum install httpd -y
+[paul@centos02 ~]$ sudo systemctl start httpd.service
+[paul@centos02 ~]$ sudo systemctl status httpd.service
+```
 
+Now in your browser, try to access the IP of the `centos2` server; you should be able to see the default Apache page. The content of this default page will be stored in `/var/www/html/` on the server. We need to replace the default webpage with our new webpage stored in a GitHub repository.
+
+In Jenkins Dashboard:
+1. Click on **New Item**. Enter an item name: `webserver-update`. Choose **Freestyle project**. Click on **OK**.
+2. Scroll down to **Source Code Management**. Choose **Git**.
+3. Provide the **Repository URL** of the GitHub repo.
+
+At this point, Jenkins should be able to pull the repo from GitHub and store it in the `centos1` **workspace** of this Jenkins Job at `/var/lib/jenkins/workspace/webserver-update/index.html`. The next step is to copy this `index.html` file to the `centos2` server in the `/var/www/html/` path and restart the Apache service. For this, we will use an Ansible playbook. Create a simple playbook on the `centos1` server to perform this task.
+
+```sh
+[paul@centos01 playbooks]$ vi webserver_update.yml
+```
+
+```yml
+---
+- name: Upload new code and Restart the service 
+  hosts: 10.211.55.11
+  vars:
+    - app: httpd
+
+  tasks:
+  - name: Place custom HTML File
+    copy:
+      src: /var/lib/jenkins/workspace/webserver-update/index.html
+      dest: /var/www/html/index.html
+    become: true
+  
+  - name: Start the service 
+    service:
+      name: httpd
+      state: restarted 
+      enabled: yes 
+    become: true
+```
+
+4. Scroll down to **Build Steps**. Click on the **Add build step** dropdown. Choose **Invoke Ansible Playbook**.
+5. Provide the **Playbook path**: `/etc/ansible/playbooks/webserver_update.yml`.
+6. In the same option, scroll down to the **Advanced** dropdown. Scroll down to **Extra Variables**. Click on **Add Extra Variable**.
+7. In the **Key** field, provide `ansible_become_pass`. And in the **Value** field, provide `jenkins` (the sudo password of the jenkins user on `centos2`, to run the Ansible playbook with sudo access).
+8. Click on **Save**. Then click on **Build Now**.
+
+Now this job should be able to pull the code from GitHub, copy it to the remote server, and restart the Apache service using the Ansible playbook.
+
+You can also configure SCM polling to automatically pull the code from GitHub when changes are detected. Additionally, set up email notifications for job failure.
+
+In the Jenkins dashboard:
+- Click on the **webserver-update** job. Click on **Configure**.
+- Scroll down to **Build Triggers**. Check **Poll SCM**. In **Schedule**, provide the cron expression `* * * * *`.
+- Scroll down to **Post-build Actions**. Click on **Add Post-build Actions** dropdown. Choose **E-mail Notification**. Provide the recipient email ID.
+- Click on **Save**.

@@ -461,3 +461,49 @@ In the Jenkins dashboard:
 - Scroll down to **Build Triggers**. Check **Poll SCM**. In **Schedule**, provide the cron expression `* * * * *`.
 - Scroll down to **Post-build Actions**. Click on **Add Post-build Actions** dropdown. Choose **E-mail Notification**. Provide the recipient email ID.
 - Click on **Save**.
+
+### User Management in Jenkins
+
+User management in Jenkins is crucial when working in a team, where different users require various levels of access and permissions.
+
+- In the Jenkins Dashboard, click on **Manage Jenkins**. Scroll down to **Security** and click on **Users**.
+- Click on **Create User**. Provide **Username** (e.g., `nick`), **Password**, **Full Name**, and **Email address**. Click on **Create User**.
+- Now, in **Manage Jenkins**, click on **Plugins**. Click on **Available Plugins**. Search for and install the **Role-based Authorization Strategy** plugin.
+- Check the box **Restart Jenkins when installation is complete and no jobs are running** after installation.
+- Wait for Jenkins to restart. Once restarted, you will be signed out. Log in to Jenkins using the new user `nick` you just created.
+
+By default, this new user will have all permissions. You need to restrict the permissions of this user.
+- Click on **Manage Jenkins**. Scroll down to **Security** and click on **Configure Global Security**.
+- Scroll down to **Authorization**. Click on the dropdown and choose **Role-based Strategy**. Click on **Save**.
+- Now, in **Manage Jenkins**, scroll down to **Security** and click on **Manage and Assign Roles**. Click on **Manage Roles**.
+- Scroll down to **Role to add**. Enter a role name (e.g., `read-only`) and click on **Add**.
+- Your new role will appear under **Global roles**. Check the boxes for the permissions you want to assign to this role (e.g., `read`). Click on **Save**.
+
+To assign the `read-only` role to the `nick` user:
+- In the same **Manage and Assign Roles** section, click on **Assign Roles**.
+- Under **Global roles**, click on **Add User** and type the **User ID** (e.g., `nick`). Click on **OK**.
+- Check the box for `read-only` against the user `nick`. Click on **Save**.
+
+Now, you can log in to Jenkins with the `nick` user, who will have only read-only permissions.
+
+### Environment Variables in Jenkins
+
+When a Jenkins job executes, it sets some pre-defined environment variables that you can use in your shell script, batch command, etc.
+
+You can use pre-defined variables in Jenkins, such as `BUILD_NUMBER`, `WORKSPACE`, etc.
+
+For more information on Jenkins environment variables, refer to the [Jenkins Environment Variables Documentation](https://wiki.jenkins.io/display/JENKINS/Building+a+software+project#Buildingasoftwareproject-belowJenkinsSetEnvironmentVariables).
+
+- **Example Usage:** In any job, under **Build Steps**, if you use **Execute Shell**, you can pass environment variables with the `$` sign, just like in Linux, and it will get the pre-defined values for you.
+
+    ```sh
+    echo $WORKSPACE
+    echo $BUILD_NUMBER
+    ```
+
+- **Creating Custom Environment Variables:**
+  1. In Jenkins, click on **Manage Jenkins**. Click on **System**.
+  2. Scroll down to **Global Properties**. Check **Environment Variables**. In **List of Variables**, click on the **Add** button.
+  3. Provide a **Name** and **Value** for your custom environment variable. Click on **Save**.
+
+Now you can use this custom environment variable anywhere in Jenkins, just like the pre-defined variables.

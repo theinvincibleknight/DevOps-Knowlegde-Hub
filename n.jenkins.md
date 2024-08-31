@@ -507,3 +507,342 @@ For more information on Jenkins environment variables, refer to the [Jenkins Env
   3. Provide a **Name** and **Value** for your custom environment variable. Click on **Save**.
 
 Now you can use this custom environment variable anywhere in Jenkins, just like the pre-defined variables.
+
+### Maven with Jenkins
+
+Maven is a build automation tool used primarily for Java projects.
+
+We are using the following Git Repository for this example:  
+https://github.com/jenkins-docs/simple-java-maven-app.git
+
+In Jenkins Dashboard:
+1. Click on **New Item**. Enter an item name: `maven-demo`. Choose **Freestyle project**. Click on **OK**.
+2. Scroll down to **Source Code Management**. Choose **Git**.
+3. Provide the **Repository URL** of the GitHub repo where your Maven project is saved.
+4. Scroll down to **Branches to build**. In **Branch Specifier**, check the branch. It should be the same branch as your project in GitHub.
+5. Click on **Save**. And click on **Build Now**.
+
+Now, the code should be cloned into the Jenkins Workspace. To install Maven, we need plugins.
+
+**Maven Installation:**
+1. Click on **Manage Jenkins**. Click on **Plugins**. Click on **Available Plugins**.
+2. Search for and install the **Maven Integration** plugin. (You can use it right away or after a restart.)
+3. Once this is installed, click on **Manage Jenkins**. Click on **Tools**.
+4. Scroll down to **Maven Installation**. Click on **Maven**.
+5. Provide a **Name**, check the box **Install automatically**, and select the Maven version in **Install from Apache**. Click on **Save**.
+6. Select the `maven-demo` job. Click on **Configure**. Scroll down to **Build Steps**.
+7. Click on **Add build step** and select **Invoke top-level Maven targets**.
+   - In the **Maven Version** field, select the desired Maven version to use for this build.
+   - In the **Goals** field, provide the Maven goals that you want to execute.
+
+     For building a JAR file using Maven, you would typically use the command `mvn -B -DskipTests clean package` in a command-line environment. However, in Jenkins, you don’t need to include `mvn` in the Goals field. You only need to specify the Maven goals directly. So, you would enter `-B -DskipTests clean package` in the Goals field.
+8. Click on **Save**. And click on **Build Now**.
+
+> If you get a BUILD FAILURE error while compiling the file with **javac**, check in the Jenkins server if the **javac** command is present. If not present already, you need to install `java-17-openjdk-devel.aarch64`. You can use the command `sudo yum install java-17-openjdk-devel.aarch64` for the installation. Once installed, try to build again in Jenkins.
+
+Once the build is successful, you should be able to see the `my-app-1.0-SNAPSHOT.jar` file in the `/var/lib/jenkins/workspace/maven-demo/target/my-app-1.0-SNAPSHOT.jar` directory. A new folder named **target** will be created in the workspace, and the `.jar` file will be inside that folder.
+
+### TESTING Of Application
+
+So, the code we have in GitHub, if you go inside the **src** folder, you will see `main/java/com/mycompany/app` and `test/java/com/mycompany/app`. The main code will be present in the main folder and test cases will be present in the test folder.
+
+Now using Jenkins, in the first step, we cloned the code; in the next step, we built the JAR file of the code using Maven. In this step, we need to test the application. For this, we use `mvn test` in the command line. In Jenkins, we need to pass this value in the **Goals** field.
+
+- Select the `maven-demo` job. Click on **Configure**. Scroll down to **Build Steps**. Add another build step.
+- Click on **Add build step** and select **Invoke top-level Maven targets**.
+  - In the **Maven Version** field, select the desired Maven version to use for this build.
+  - In the **Goals** field, provide the Maven goals that you want to execute. In our case, you just provide `test`. And click on **Save** and click on **Build Now**.
+
+Now the job will build the JAR file as well as test the code too. Your console output will be something like:
+
+```
+......
+.
+.
+.
+Downloaded from central: https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-
+launcher/1.10.2/junit-platform-launcher-1.10.2.jar (184 kB at 3.6 MB/s)
+[INFO]
+[INFO] --------------------------------------------------------
+[INFO]    T E S T S
+[INFO] --------------------------------------------------------
+[INFO] Running com.mycompany.app.AppTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 - in com.mycompany-app.AppTest
+[INFO]
+[INFO] Results:
+[INFO]
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] -------------------------------------------------------------------------
+[INFO] BUILD SUCCESS [INFO]
+[INFO] -------------------------------------------------------------------------
+Total time: 2.771 s
+[INFO] Finished at: 2024-04-12T11:35:44+05:30
+[INFO] -------------------------------------------------------------------------
+Finished: SUCCESS
+```
+
+### Local Deployment Of App
+
+Now, since we have built the application and tested it, we need to deploy the application. As we are doing a local deployment, we already have a JAR file and just need to run it.
+
+- Select the `maven-demo` job. Click on **Configure**. Scroll down to **Build Steps**. Add another build step.
+- Click on **Add build step** and select **Execute Shell**.
+- In **Command**, provide `java -jar <location_of_the_jar>`.
+```
+echo "DEPLOYMENT STEP"
+java -jar /var/lib/jenkins/workspace/maven-demo/target/my-app-1.0-SNAPSHOT.jar
+```
+- Click on **Save** and click on **Build Now**.
+
+Your console output should be something like:
+```
+...
+.
+.
+.
+[INFO] -------------------------------------------------------------------------
+[INFO] BUILD SUCCESS 
+[INFO] -------------------------------------------------------------------------
+[INFO] Total time: 1.573 s
+[INFO] Finished at: 2024-04-12T12:12:38+05:30
+[INFO] -------------------------------------------------------------------------
+[maven-demo] $ /bin/sh -xe /tmp/jenkins12320327623376406642.sh 
++ echo 'DEPLOYMENT STEP'
+DEPLOYMENT STEP
++ java -jar /var/lib/jenkins/workspace/maven-demo/target/my-app-1.0-SNAPSHOT.jar
+Hello World!
+Finished: SUCCESS
+```
+
+### Test Results Graph
+
+Whenever we click on **Build Now**, we can see the results in **Build History**. But there is also another way of graphical representation of results.
+
+- In Jenkins, select the `maven-demo` job, click on **Workspace**, and you will get **Workspace of maven-demo on Built-in Node**. This is basically your directory structure of the `maven-demo` job workspace from the server.
+- Under **maven-demo/**, you will see multiple folders. Select **target/**. Select **surefire-reports/**. Inside this folder, you will see an **.xml** file.
+  If you open it, it will generate a report in XML format. Just copy the path to this report.
+- Click on **Configure**. Scroll down to **Post-build Actions**. Click on **Add post-build actions** dropdown. Select **Publish JUnit test result report**.
+- In **Test report XMLs**, provide the path of the XML file `target/surefire-reports/*.xml`.
+- Click on **Save** and click on **Build Now**.
+
+Now once it builds, you will get results in Build History as usual. Also, in job **Status**, you will get a **Test Result Trend** option, which graphically represents the results.
+
+### Archive Artifact
+
+- Click on **Configure**. Scroll down to **Post-build Actions**. Click on **Add post-build actions** dropdown. Select **Archive the artifacts**.
+- In **Files to archive**, provide the file path you want to archive: `target/*.jar`.
+- Click on **Advanced**, check the box **Archive artifacts only if the build is successful**.
+- Click on **Save** and click on **Build Now**.
+
+Now in the status, you will see `my-app-1.0-SNAPSHOT.jar` in **Last Successful Artifacts**. This will save artifacts of every build. You can download them by clicking on it.
+
+### Jenkins Pipeline
+
+The flowchart below is an example of one CD scenario easily modeled in Jenkins Pipeline:
+
+![CD Pipeline](https://www.jenkins.io/doc/book/resources/pipeline/realworld-pipeline-flow.png)
+
+In Jenkins Dashboard:
+- Click on **New Item**. Provide an **Item name**, in this example `pipeline-demo`, choose **Pipeline**, and click on **OK**.
+- In **Configure**, scroll down to **Pipeline**. In **Definition**, choose **Pipeline Script**.
+- In **Script**, you will get a dropdown to choose **try sample pipeline**. Choose **Hello World**.
+
+```
+pipeline {
+    agent any
+
+    stages {
+        stage('Hello') {
+            steps {
+                echo 'Hello World'
+            }
+        }
+    }
+}
+```
+- Check the box
+
+ **Use Groovy Sandbox**.
+- Click on **Save** and click on **Build Now**.
+- In the **Status** option, you will see **Stage View**. When you hover over the result of the stage view, you will get a **Logs** button. You will get logs of every stage.
+- Click on the **Logs** button to view the logs.
+
+> When you have multiple steps, and if any step fails in between, it will not proceed to the next step.
+
+#### Multi-Steps Pipeline Step
+
+If you want to execute any shell command, you will use `sh` to pass the commands.
+
+- Single Line Commands
+```
+pipeline {
+    agent any
+
+    stages {
+        stage('Build') {
+            steps {
+                sh 'echo Hello'
+            }
+        }
+    }
+}
+```
+- Multi Line Commands
+```
+pipeline {
+    agent any
+
+    stages {
+        stage('Build') {
+            steps {
+                sh '''
+                    echo Hello
+                    echo World
+                '''
+            }
+        }
+    }
+}
+```
+#### Retry Steps in Jenkins Pipeline
+
+If you want any step to retry multiple times, you can use `retry(number_of_times)`.
+
+```
+pipeline {
+    agent any
+
+    stages {
+        stage('Build') {
+            steps {
+                sh '''
+                    echo Hello
+                    echo World
+                '''
+                retry(3){
+                    sh 'echo trying...'
+                }
+            }
+        }
+    }
+}
+```
+In the **retry** section, as `ech` is not a valid command, it tries to execute it 3 times then fails.
+
+#### Timeout Function in Jenkins
+
+If you have some task that is taking too much time to execute, you can add a **timeout function** to control this.
+
+```
+pipeline {
+    agent any
+
+    stages {
+        stage('Build') {
+            steps {
+                sh '''
+                    echo Hello
+                    echo World
+                '''
+                retry(3){
+                    sh 'echo trying...'
+                }
+
+                timeout(time:5, unit:'SECONDS'){
+                    sh 'sleep 30'
+                }
+            }
+        }
+    }
+}
+```
+
+In the above example, in the timeout section, we have a command to go to sleep mode for 30 seconds before completing the job using `sh 'sleep 30'`. But the timeout function has set a time limit of 5 seconds using `timeout(time:5, unit:'SECONDS')`. Hence, it should get timed out after 5 seconds and shouldn't wait for 30 seconds.
+
+#### Environment Variables in Jenkins
+
+To use environment variables in the script, you need to provide an environment block in the script.
+
+```
+pipeline {
+    agent any
+
+    environment {
+        NAME="Paul"
+        AGE=20
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                sh '''
+                    echo $NAME
+                    echo $AGE
+                '''
+                //retry(3){
+                //    sh 'echo trying...'
+                //}
+            }
+        }
+    }
+}
+```
+
+Now when you **Save** and click on **Build Now**, environment variables should be able to fetch the values from the environment block.
+
+> Using `//` you can comment out the commands.
+
+If you want to provide any secret values and you don't want to enter the values openly in the script, you can use Jenkins to store the credentials and use environment variables to fetch the value.
+
+- Click on **Manage Jenkins**. Click on **Credentials**.
+- In **Stores scoped to Jenkins**, click on **System**.
+- In **System**, you will see **Global credentials (unrestricted)** dropdown. Click on the dropdown and click on **Add credentials**.
+- In the **New Credentials** page, in **Kind**, choose **Secret text**. Under this, **Scope** should be **Global (Jenkins, nodes, items, all child items, etc.)**. Provide your `Password` in the **Secret** option. And in **ID**, you can use any name; in this example, we use `PASS`.
+- Click on **Create**.
+
+Now in the script, you can use `credentials('ID_name')` to fetch the secret.
+
+```
+pipeline {
+    agent any
+
+    environment {
+        NAME="Paul"
+        AGE=20
+        PASSWORD=credentials('PASS')
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                sh '''
+                    echo $NAME
+                    echo $PASSWORD
+                    echo $AGE
+                '''
+            }
+        }
+    }
+}
+```
+Now the variable `$PASSWORD` has the value `credentials('PASS')`, which fetches the password from Jenkins when the build runs. But no one will be able to see the password even after the build is successful in **Console Output** or **Logs**. It will display as `*******` to maintain secrecy.
+
+**Console Output:**
+```
+...
+.
+.
+[Pipeline] { (Build)
+[Pipeline] sh
++ echo Paul
+Paul
++ echo ****
+****
++ echo 20
+20
+[Pipeline] }
+.
+.
+...
+```

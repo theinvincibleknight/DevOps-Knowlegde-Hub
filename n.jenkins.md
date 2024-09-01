@@ -648,7 +648,7 @@ In Jenkins Dashboard:
 - In **Configure**, scroll down to **Pipeline**. In **Definition**, choose **Pipeline Script**.
 - In **Script**, you will get a dropdown to choose **try sample pipeline**. Choose **Hello World**.
 
-```
+```groovy
 pipeline {
     agent any
 
@@ -661,9 +661,7 @@ pipeline {
     }
 }
 ```
-- Check the box
-
- **Use Groovy Sandbox**.
+- Check the box **Use Groovy Sandbox**.
 - Click on **Save** and click on **Build Now**.
 - In the **Status** option, you will see **Stage View**. When you hover over the result of the stage view, you will get a **Logs** button. You will get logs of every stage.
 - Click on the **Logs** button to view the logs.
@@ -675,7 +673,7 @@ pipeline {
 If you want to execute any shell command, you will use `sh` to pass the commands.
 
 - Single Line Commands
-```
+```groovy
 pipeline {
     agent any
 
@@ -689,7 +687,7 @@ pipeline {
 }
 ```
 - Multi Line Commands
-```
+```groovy
 pipeline {
     agent any
 
@@ -709,7 +707,7 @@ pipeline {
 
 If you want any step to retry multiple times, you can use `retry(number_of_times)`.
 
-```
+```groovy
 pipeline {
     agent any
 
@@ -721,7 +719,7 @@ pipeline {
                     echo World
                 '''
                 retry(3){
-                    sh 'echo trying...'
+                    sh 'ech trying...'
                 }
             }
         }
@@ -734,7 +732,7 @@ In the **retry** section, as `ech` is not a valid command, it tries to execute i
 
 If you have some task that is taking too much time to execute, you can add a **timeout function** to control this.
 
-```
+```groovy
 pipeline {
     agent any
 
@@ -764,7 +762,7 @@ In the above example, in the timeout section, we have a command to go to sleep m
 
 To use environment variables in the script, you need to provide an environment block in the script.
 
-```
+```groovy
 pipeline {
     agent any
 
@@ -803,7 +801,7 @@ If you want to provide any secret values and you don't want to enter the values 
 
 Now in the script, you can use `credentials('ID_name')` to fetch the secret.
 
-```
+```groovy
 pipeline {
     agent any
 
@@ -845,4 +843,284 @@ Paul
 .
 .
 ...
+```
+
+### Maven Project With Jenkins Pipeline
+
+We are using the following Git Repository for this example:  
+[https://github.com/jenkins-docs/simple-java-maven-app.git](https://github.com/jenkins-docs/simple-java-maven-app.git)
+
+In Jenkins Dashboard:
+- Click on **New Item**. Provide an **Item name**; in this example, use `maven-pipeline`. Choose **Pipeline** and click **OK**.
+- In **Configure**, scroll down to **Pipeline**. In **Definition**, choose **Pipeline Script**.
+- In **Script**, you will get a dropdown to choose **Try sample pipeline**. Choose **GitHub+Maven**.
+  You will get a basic sample script. You can either edit the script directly there or copy it to VS Code and edit it in VS Code.
+
+```groovy
+pipeline {
+    agent any
+
+    tools {
+        // Install the Maven version configured and add it to the path.
+        maven "jenkins-maven"
+    }
+
+    stages {
+        stage ('Checkout') {
+            steps {
+                // Get some code from a GitHub repository
+                git 'https://github.com/jenkins-docs/simple-java-maven-app.git'
+            }
+        }
+        stage ('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        stage ('Test') {
+            steps {
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    junit '**/target/surefire-report/TEST-*.xml'
+                }
+            }
+        }
+        stage ('Deploy') {
+            steps {
+                // Transfer the Jar to remote server
+                sh 'echo Execute the Jar file'
+            }
+        }
+    }
+}
+```
+
+---
+
+### Explanation
+
+#### Pipeline Declaration
+```groovy
+pipeline {
+    agent any
+```
+- **agent any**: This specifies that the pipeline can run on any available agent (Jenkins node). It means Jenkins will use any available machine to execute the pipeline stages.
+
+#### Tools Section
+```groovy
+    tools {
+        maven "jenkins-maven"
+    }
+```
+- **tools**: This section defines tools required for the pipeline. Here, it specifies that Maven should be installed and configured. `"jenkins-maven"` is the name of the Maven installation configured in Jenkins (this should match a tool name configured in Jenkins' global tool configuration).
+
+#### Stages
+The pipeline consists of several stages, each performing a different task in the CI/CD process.
+
+##### 1. Checkout
+```groovy
+    stages {
+        stage ('Checkout') {
+            steps {
+                git 'https://github.com/jenkins-docs/simple-java-maven-app.git'
+            }
+        }
+```
+- **stage ('Checkout')**: This stage is responsible for retrieving the source code from a Git repository.
+- **git 'https://github.com/jenkins-docs/simple-java-maven-app.git'**: This step clones the specified GitHub repository to the Jenkins workspace.
+
+##### 2. Build
+```groovy
+        stage ('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+```
+- **stage ('Build')**: This stage compiles and packages the code.
+- **sh 'mvn clean package'**: Executes the Maven command to clean any previous build artifacts and then package the application into a JAR file.
+
+##### 3. Test
+```groovy
+        stage ('Test') {
+            steps {
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    junit '**/target/surefire-report/TEST-*.xml'
+                }
+            }
+        }
+```
+- **stage ('Test')**: This stage runs the unit tests for the application.
+- **sh 'mvn test'**: Runs the Maven test phase to execute the tests.
+- **post**: After the test step has completed, this block defines actions to be performed regardless of the test result.
+  - **always**: Ensures that the following steps run even if the tests fail.
+  - **junit '**/target/surefire-report/TEST-*.xml'**: Publishes the test results to Jenkins using the JUnit plugin. This allows Jenkins to display test results in the build report.
+
+##### 4. Deploy
+```groovy
+        stage ('Deploy') {
+            steps {
+                sh 'echo Execute the Jar file'
+            }
+        }
+    }
+}
+```
+- **stage ('Deploy')**: This stage is intended for deployment tasks.
+- **sh 'echo Execute the Jar file'**: This is a placeholder command that simply prints a message. In a real deployment, this would likely be replaced with commands to transfer the JAR file to a remote server or execute the JAR file on a deployment server.
+
+---
+
+- Once the script is written in VS Code, copy it into the Jenkins job's **Pipeline Script** section. Click **Save** and then **Build Now**.
+- You should be able to see the status of each stage in the **Stage View** board.
+
+    Declarative: Tool Install > Checkout > Build > Test > Deploy
+
+- If any stage fails, for example, if the **Test** stage fails, the subsequent **Deploy** stage will not be executed.
+
+#### Adding Archiving Artifacts and Email Notification
+
+You need to add a **post** block after the completion of the **stages** block. Provide the commands to send an email notification in case of build failure and to archive the artifacts if the build is successful.
+
+```groovy
+pipeline {
+    agent any
+
+    tools {
+        // Install the Maven version configured and add it to the path.
+        maven "jenkins-maven"
+    }
+
+    stages {
+        stage ('Checkout') {
+            steps {
+                // Get some code from a GitHub repository
+                git 'https://github.com/jenkins-docs/simple-java-maven-app.git'
+            }
+        }
+        stage ('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        stage ('Test') {
+            steps {
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    junit '**/target/surefire-report/TEST-*.xml'
+                }
+            }
+        }
+        stage ('Deploy') {
+            steps {
+                // Transfer the Jar to a remote server
+                sh 'echo Execute the Jar file'
+            }
+        }
+    }
+    post {
+        failure {
+            echo 'failure!'
+            mail to: 'phillippaul019@gmail.com',
+                subject: "FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: "Job '${env.JOB_NAME}' (${env.BUILD_URL}) failed."
+        }
+        success {
+            echo 'Build and Test Stages Successful!'
+            archiveArtifacts artifacts: '**/target/*.jar', onlyIfSuccessful: true
+        }
+    }
+}
+```
+Now, if the build is successful, you should see the artifact file in the **Stage View**, which you can download. If the build fails, you will receive a **Mail Notification** mentioning the build failure, with a **Build URL** in the email. You can click on it to see the **Console Output** and get the logs for failure.
+
+#### Approval Before Deployment
+
+In some cases, you may need manual approval before proceeding with deployment instead of automatic deployment. For this, you need to add another stage in the pipeline script for `Approval`.
+
+In this example, we are adding an `Approval` stage after the `Test` stage.
+
+```groovy
+pipeline {
+    agent any
+
+    tools {
+        // Install the Maven version configured and add it to the path.
+        maven "jenkins-maven"
+    }
+
+    stages {
+        stage ('Checkout') {
+            steps {
+                // Get some code from a GitHub repository
+                git 'https://github.com/jenkins-docs/simple-java-maven-app.git'
+            }
+        }
+        stage ('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        stage ('Test') {
+            steps {
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    junit '**/target/surefire-report/TEST-*.xml'
+                }
+            }
+        }
+        stage ('Approval') {
+            steps {
+                input 'Approve Deployment to Production?'
+            }
+        }
+        stage ('Deploy') {
+            steps {
+                // Transfer the Jar to a remote server
+                sh 'echo Execute the Jar file'
+            }
+        }
+    }
+    post {
+        failure {
+            echo 'failure!'
+            mail to: 'phillippaul019@gmail.com',
+                subject: "FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: "Job '${env.JOB_NAME}' (${env.BUILD_URL}) failed."
+        }
+        success {
+            echo 'Build and Test Stages Successful!'
+            archiveArtifacts artifacts: '**/target/*.jar', onlyIfSuccessful: true
+        }
+    }
+}
+```
+
+Now, when you build this job, after the **Test** stage is completed, it will wait for you to manually approve proceeding with the next stage, **Deploy**. In **Stage View**, when you hover over the **Approval** stage, you will get options to click on **Proceed** or **Cancel**. You need to choose whether to proceed with deployment based on your requirements.
+
+> You can use Jenkins [Pipeline Syntax](https://www.jenkins.io/doc/book/pipeline/syntax/#steps) official documentation for reference.
+
+### Snippet Generator Jenkinsfile
+
+Jenkins will help you generate pipeline script syntax that you can use in your scripts. You just need to add `pipeline-syntax` after the Jenkins URL. In our case, our Jenkins URL is "http://10.211.55.7:8080/". For the syntax generator, you can use "http://10.211.55.7:8080/pipeline-syntax".
+
+You will get multiple options like Snippet Generator, Declarative Directive Generator, etc.
+
+- For example, in **Snippet Generator**, in **Steps**, select **archiveArtifacts: Archive the artifacts** from the dropdown.
+- In **Files to archive**, provide `/target/*.jar`.
+- Click on the **Advanced** dropdown and check the box **Archive the artifact only if build is successful**.
+- Click **Generate Pipeline Script**.
+
+This will generate a syntax that you can use in your pipeline script:
+```groovy
+archiveArtifacts artifacts: '/target/*.jar', followSymlinks: false, onlyIfSuccessful: true
 ```
